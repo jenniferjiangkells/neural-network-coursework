@@ -99,7 +99,10 @@ class SigmoidLayer(Layer):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        pass
+        # sigmoid(x) = 1/(1+exp(-x))
+        # derive: sigmoid(x) * (1-sigmoid(x)), so put it into cache
+        self._cache_current = 1. / (1. + np.exp(-x))
+        return self._cache_current
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -109,7 +112,8 @@ class SigmoidLayer(Layer):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        pass
+        # f'(x) * grad_z (elementwise multiply)
+        return self._cache_current * (1. - self._cache_current) * grad_z
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -128,7 +132,9 @@ class ReluLayer(Layer):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        pass
+        # return the positive part
+        self._cache_current = x
+        return x * (x > 0)
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -138,7 +144,8 @@ class ReluLayer(Layer):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        pass
+        # derive = 1 if larger than 0, otherwise 0, elementwise multiply as well
+        return (self._cache_current > 0) * grad_z
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -163,12 +170,12 @@ class LinearLayer(Layer):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        self._W = None
-        self._b = None
+        self._W = xavier_init((n_in, n_out))
+        self._b = xavier_init((n_out))
 
         self._cache_current = None
-        self._grad_W_current = None
-        self._grad_b_current = None
+        self._grad_W_current = np.zeros((n_in, n_out))
+        self._grad_b_current = np.zeros((n_out))
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -191,6 +198,10 @@ class LinearLayer(Layer):
         #                       ** START OF YOUR CODE **
         #######################################################################
 
+        # put the data into cache, for future backward
+        self._cache_current = x
+        return np.matmul(x, self._W) + self._b
+
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
@@ -206,12 +217,18 @@ class LinearLayer(Layer):
             grad_z {np.ndarray} -- Gradient array of shape (batch_size, n_out).
 
         Returns:
-            {np.ndarray} -- Array containing gradient with repect to layer
+            {np.ndarray} -- Array containing gradient with respect to layer
                 input, of shape (batch_size, n_in).
         """
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
+
+        # calculate gradient
+        self._grad_W_current = np.matmul(self._cache_current.T, grad_z)
+        self._grad_b_current = np.sum(grad_z, axis=0)
+        # backward to the former layer
+        return np.matmul(grad_z, self._W.T)
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -229,10 +246,12 @@ class LinearLayer(Layer):
         #                       ** START OF YOUR CODE **
         #######################################################################
 
+        self._W -= learning_rate * self._grad_W_current
+        self._b -= learning_rate * self._grad_b_current
+
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
-
 
 class MultiLayerNetwork(object):
     """
@@ -262,12 +281,13 @@ class MultiLayerNetwork(object):
 
         #initialize layers as an empty list
         self._layers = []
+        isActivationLayer = False
         linearLayerCount = 0
         activationLayerCount = 0
-        isActivationLayer = False
+        totalLayers = len(self.activations) + len(self.neurons)
 
         #stack linear and activation layers
-        for i in range(len(self.activations) + len(self.neurons)):
+        for i in range(totalLayers):
 
             if isActivationLayer == False:
 
@@ -291,7 +311,6 @@ class MultiLayerNetwork(object):
                 elif self.activations[activationLayerCount] == "sigmoid":
                     _activation = SigmoidLayer()
                 elif self.activations[activationLayerCount] == "identity":
-                    activationLayerCount += 1
                     continue
                 else:
                     raise ValueError("Activation layer error")
@@ -533,12 +552,9 @@ class Trainer(object):
                 #batch_target = batch_target_array[number_of_batches]
 
                 #perform forward pass in the network
-                print(batch_input)
                 batch_output = self.network(batch_input)
 
                 #compute loss
-                print (batch_output)
-                print(batch_target)
                 batch_loss = self._loss_layer.forward(batch_output, batch_target)
 
                 #perform backward pass to compute gradients of loss in network
