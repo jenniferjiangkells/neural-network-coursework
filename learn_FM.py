@@ -2,14 +2,14 @@ import numpy as np
 import csv
 from sklearn.model_selection import GridSearchCV
 
-from nn_lib import (
+from neuralnetworks_31.nn_lib import (
     MultiLayerNetwork,
     Trainer,
     Preprocessor,
     save_network,
     load_network,
 )
-from illustrate import illustrate_results_FM
+from neuralnetworks_31.illustrate import illustrate_results_FM
 from sklearn.metrics import mean_squared_error
 
 
@@ -53,6 +53,7 @@ def main(_neurons, _activationFunctionHidden, _activationFunctionOutput, _lossFu
     )
 
     # Train the neural network
+    print("x_train_pre", x_train_pre)
     trainer.train(x_train_pre, y_train)
     print("Train loss = ", trainer.eval_loss(x_train_pre, y_train))
     print("Validation loss = ", trainer.eval_loss(x_val_pre, y_val))
@@ -153,7 +154,7 @@ def evaluate_architecture(y_true, y_pred):
 
 if __name__ == "__main__":
     # Setup for the hyperparameters for main()
-    neurons = []
+    neurons = [3]
     activationFunctions = []
     outputDimension = 3
 
