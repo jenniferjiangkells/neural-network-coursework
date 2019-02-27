@@ -1,4 +1,5 @@
 import numpy as np
+import math
 import pickle
 
 
@@ -256,7 +257,51 @@ class MultiLayerNetwork(object):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        self._layers = None
+        #check inputs match
+        assert len(activations) == len(neurons)
+
+        #initialize layers as an empty list
+        self._layers = []
+        linearLayerCount = 0
+        activationLayerCount = 0
+        isActivationLayer = False
+
+        #stack linear and activation layers
+        for i in range(len(self.activations) + len(self.neurons)):
+
+            if isActivationLayer == False:
+
+                #determine the input and output dimensions
+                if linearLayerCount == 0:
+                    _input_dim = self.input_dim
+                else:
+                    _input_dim = self.neurons[linearLayerCount-1]
+
+                _output_dim = self.neurons[linearLayerCount]
+
+                #call LinearLayer and append to _layer
+                self._layers.append(LinearLayer(_input_dim,_output_dim))
+                linearLayerCount += 1
+                isActivationLayer = True
+
+            else:
+                #append the activation layer after the linear layer
+                if self.activations[activationLayerCount] == "relu":
+                    _activation = ReluLayer()
+                elif self.activations[activationLayerCount] == "sigmoid":
+                    _activation = SigmoidLayer()
+                elif self.activations[activationLayerCount] == "identity":
+                    activationLayerCount += 1
+                    continue
+                else:
+                    raise ValueError("Activation layer error")
+
+                self._layers.append(_activation)
+                activationLayerCount += 1
+                isActivationLayer = False
+
+        print(self._layers)
+
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
@@ -275,6 +320,17 @@ class MultiLayerNetwork(object):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
+
+        output_array = None
+
+        #call forward pass method on each layer
+        for i in range(len(self._layers)):
+            if i == 0:
+                output_array = self._layers[i].forward(x)
+            else:
+                output_array = self._layers[i].forward(output_array)
+
+        return output_array
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -299,6 +355,19 @@ class MultiLayerNetwork(object):
         #                       ** START OF YOUR CODE **
         #######################################################################
 
+        gradient_array = None
+        i = len(self._layers) -1
+
+        #call backward pass method on each layer
+        while i >= 0:
+            if i == len(self._layers) -1:
+                gradient_array = self._layers[i].backward(grad_z)
+            else:
+                gradient_array = self._layers[i].backward(gradient_array)
+            i -= 1
+
+        return gradient_array
+
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
@@ -314,6 +383,9 @@ class MultiLayerNetwork(object):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
+
+        for i in range(len(self._layers)):
+            self._layers[i].update_params(learning_rate)
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -373,7 +445,17 @@ class Trainer(object):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        self._loss_layer = None
+
+        #self._loss_layer = None
+
+        #configure the loss later values
+        if self.loss_fun == "mse":
+            self._loss_layer = MSELossLayer()
+        elif self.loss_fun == "bce" or self.loss_fun == "cross_entropy":
+            self._loss_layer = CrossEntropyLossLayer()
+        else:
+            raise ValueError("Loss function error")
+
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
@@ -394,6 +476,16 @@ class Trainer(object):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
+
+        #merge the dataset and pair the input and target
+        totalDataset = np.append(input_dataset, target_dataset, 1)
+
+        np.random.shuffle(totalDataset)
+
+        shuffled_inputs = totalDataset[:, 0:input_dataset.shape[1]]
+        shuffled_outputs = totalDataset[:, input_dataset.shape[1]: ]
+
+        return shuffled_inputs, shuffled_outputs
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -423,6 +515,40 @@ class Trainer(object):
         #                       ** START OF YOUR CODE **
         #######################################################################
 
+        for epoch in range(self.nb_epoch):
+
+            if self.shuffle_flag == True:
+                input_dataset, target_dataset = self.shuffle(input_dataset, target_dataset)
+
+
+            number_of_batches = math.ceil(input_dataset.shape[0] / self.batch_size)
+            #batch_input_array = np.vsplit(input_dataset, number_of_batches)
+            #batch_target_array = np.vsplit(target_dataset, number_of_batches)
+
+            for i in range(number_of_batches):
+                #split data into batch_sizes
+                batch_input = input_dataset[i*self.batch_size:(i+1)*self.batch_size, :]
+                batch_target = target_dataset[i*self.batch_size:(i+1)*self.batch_size, :]
+                #batch_input = batch_input_array[number_of_batches]
+                #batch_target = batch_target_array[number_of_batches]
+
+                #perform forward pass in the network
+                print(batch_input)
+                batch_output = self.network(batch_input)
+
+                #compute loss
+                print (batch_output)
+                print(batch_target)
+                batch_loss = self._loss_layer.forward(batch_output, batch_target)
+
+                #perform backward pass to compute gradients of loss in network
+                grad_z = self._loss_layer.backward()
+                network_grad = self.network.backward(grad_z)
+
+                #perform one step gradient descent
+                self.network.update_params(self.learning_rate)
+
+
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
@@ -437,9 +563,18 @@ class Trainer(object):
             - target_dataset {np.ndarray} -- Array of corresponding targets, of
                 shape (#_evaluation_data_points, ).
         """
+
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
+
+        #forward pass through network
+        network_output = self.network(input_dataset)
+
+        #compute loss
+        loss = self._loss_layer.forward(network_output,target_dataset)
+
+        return loss
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -448,7 +583,7 @@ class Trainer(object):
 
 class Preprocessor(object):
     """
-    Preprocessor: Object used to apply "preprocessing" operation to datasets.
+    Preprocessor: Object used to apply preprocessing operation to datasets.
     The object can also be used to revert the changes.
     """
 
@@ -464,6 +599,9 @@ class Preprocessor(object):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
+
+        self.array_mins = data.min(axis=0)
+        self.array_maxs = data.max(axis=0)
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -483,6 +621,13 @@ class Preprocessor(object):
         #                       ** START OF YOUR CODE **
         #######################################################################
 
+        normalized_dataset = data
+
+        for i in range(normalized_dataset.shape[1]):
+            normalized_dataset.T[i] = (normalized_dataset.T[i] - self.array_mins[i]) / (self.array_maxs[i] - self.array_mins[i])
+
+        return normalized_dataset
+
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
@@ -500,6 +645,13 @@ class Preprocessor(object):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
+
+        reverted_dataset = data
+
+        for i in len(reverted_dataset.shape[1]):
+            reverted_dataset.T[i] = reverted_dataset.T[i] * (self.array_maxs[i] - self.array_mins[i]) + self.array_mins[i]
+
+        return reverted_dataset
 
         #######################################################################
         #                       ** END OF YOUR CODE **
