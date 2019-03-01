@@ -218,7 +218,7 @@ def one_hot_encode(output, numOfPossibleLabels):
 # Then, evaluate the architecture using accuracy, precision, recall and F1 score
 def evaluate_architecture(y_true, y_pred):
     # Generate and populate the confusion matrix
-    confusionMatrix = populate_confusion_matrix(y_true, y_pred)
+    confusionMatrix = get_confusion_matrix(y_true, y_pred)
 
     # Stores data on recall, precision and f1 for each label
     labelDict = dict.fromkeys({"label1", "label2", "label3", "label4"})
@@ -230,16 +230,19 @@ def evaluate_architecture(y_true, y_pred):
     for i in range(len(labelDict)):
         truePositive, falsePositive, falseNegative = calculate_metrics(confusionMatrix, index)
         if truePositive + falseNegative == 0:
-            recall=0
-        recall= truePositive / (truePositive + falseNegative)
+            recall= 0
+        else:
+            recall= truePositive / (truePositive + falseNegative)
 
         if truePositive + falsePositive == 0:
-            precision = 0
-        precision = truePositive / (truePositive + falsePositive)
+            precision = 0.0
+        else:
+            precision = truePositive / (truePositive + falsePositive)
 
         if precision + recall == 0:
-            f1 = 0
-        f1 = 2 * (precision * recall) / (precision + recall)
+            f1 = 0.0
+        else:
+            f1 = 2 * (precision * recall) / (precision + recall)
 
         totalErrors += falsePositive
 
@@ -255,7 +258,7 @@ def evaluate_architecture(y_true, y_pred):
     return accuracy, confusionMatrix, labelDict
 
 # Populates the confusion matrix (predicted x expected) based on y_true and y_pred
-def populate_confusion_matrix(y_true, y_pred):
+def get_confusion_matrix(y_true, y_pred):
     # Create an empty confusion matrix filled with 0s
     numOfRows = y_pred.shape[1]
     numOfColumns = y_true.shape[1]
