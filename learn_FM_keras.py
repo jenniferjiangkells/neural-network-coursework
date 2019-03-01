@@ -20,7 +20,7 @@ from sklearn.metrics import mean_squared_error
 
 
 def main(_neurons, _activationFunctionHidden, _activationFunctionOutput, _lossFunction, _batchSize, _learningRate,
-         _numberOfEpochs, _writeToCSV=False, _Train=True):
+         _numberOfEpochs, _writeToCSV=False, _hyperparameterTuning=False):
 
     dataset = np.loadtxt("FM_dataset.dat")
 
@@ -28,47 +28,49 @@ def main(_neurons, _activationFunctionHidden, _activationFunctionOutput, _lossFu
     #                       ** START OF YOUR CODE **
     #######################################################################
 
-    if _Train == True:
+    input_dim = 3 # CONSTANT: Stated in specification
 
-        input_dim = 3 # CONSTANT: Stated in specification
+    #shuffle the data
+    np.random.shuffle(dataset)
 
-        #shuffle the data
-        np.random.shuffle(dataset)
+    # Separate data columns into x (input features) and y (output)
+    x = dataset[:, :input_dim]
+    y = dataset[:, input_dim:]
 
-        # Separate data columns into x (input features) and y (output)
-        x = dataset[:, :input_dim]
-        y = dataset[:, input_dim:]
+    split_idx = int(0.8 * len(x))
 
-        split_idx = int(0.8 * len(x))
+    # Split data by rows into a training set and a validation set
+    x_train = x[:split_idx]
+    y_train = y[:split_idx]
+    x_val = x[split_idx:]
+    y_val = y[split_idx:]
 
-        # Split data by rows into a training set and a validation set
-        x_train = x[:split_idx]
-        y_train = y[:split_idx]
-        x_val = x[split_idx:]
-        y_val = y[split_idx:]
+    # Apply preprocessing to the data
+    x_prep_input = Preprocessor(x_train)
+    y_prep_input = Preprocessor(y_train)
 
-        # Apply preprocessing to the data
-        x_prep_input = Preprocessor(x_train)
-        y_prep_input = Preprocessor(y_train)
+    x_train_pre = x_prep_input.apply(x_train)
+    y_train_pre = y_prep_input.apply(y_train)
 
-        x_train_pre = x_prep_input.apply(x_train)
-        y_train_pre = y_prep_input.apply(y_train)
-
-        x_val_pre = x_prep_input.apply(x_val)
-        y_val_pre = y_prep_input.apply(y_val)
+    x_val_pre = x_prep_input.apply(x_val)
+    y_val_pre = y_prep_input.apply(y_val)
 
 
-        # fix random seed for reproducibility
-        seed = 7
-        np.random.seed(seed)
+    # fix random seed for reproducibility
+    seed = 7
+    np.random.seed(seed)
+
+
+
+    if _hyperparameterTuning == True:
 
         #create model
         model = KerasRegressor(build_fn=create_model,
                                 nb_epoch=_numberOfEpochs,
-                                batch_size=_batchSize)
+                                batch_size=_batchSize
+                                )
 
-        # Use scikit-learn to grid search - these are all possible paramaters, takes a long time so I only left in few values
-        batch_size = [8, 16, 32] #32
+        # Use scikit-learn to grid search
         epochs = [1] #10, 100, 250, 500, 1000?
         learn_rate = [1e-1, 1e-3, 1e-6]
         neurons = [1, 5, 15]
@@ -115,6 +117,19 @@ def main(_neurons, _activationFunctionHidden, _activationFunctionOutput, _lossFu
         filename = 'trained_FM.pickle'
         pickle.dump(best_model, open(filename, 'wb'))
 
+    else:
+
+        model = create_model()
+        history = model.fit(x_train_pre, y_train_pre,
+                    batch_size=_batchSize,
+                    epochs=numberOfEpochs,
+                    verbose=1,
+                    validation_data=(x_val_pre, y_val_pre))
+
+        #model.fit(x_train_pre,y_train_pre)
+        score = model.evaluate(x_val_pre, y_val_pre, verbose=0)
+        print('Test loss:', score[0])
+        print('Test accuracy:', score[1])
 
     #predict hidden dataset using best model
     predictions = predict_hidden(dataset)
@@ -125,29 +140,33 @@ def main(_neurons, _activationFunctionHidden, _activationFunctionOutput, _lossFu
     #######################################################################
     # illustrate_results_FM(net, prep)
 
-#create model for KerasRegressor - right now the network is just input output layer, figure out
-#how to modify number of hidden layers maybe
-def create_model(neurons=1, learn_rate=0.01, activation='relu', hidden_layers=1):
+#create keras model
+def create_model(neurons=4, learn_rate=0.01, activation='relu', hidden_layers=1):
     # default values
     input_dim = 3  # CONSTANT: Stated in specification
+    output_dim = 3
     # create model
     model = Sequential()
     #add input layer with batch normalization
-    model.add(Dense(3, input_dim=input_dim))
+    model.add(Dense(input_dim, input_dim=input_dim))
     model.add(BatchNormalization())
     model.add(Activation(activation))
     #add hidden layers
     for i in range(hidden_layers):
-        model.add(Dense(4))
+        model.add(Dense(neurons))
         model.add(BatchNormalization())
         model.add(Activation(activation))
 
     #add output layer
-    model.add(Dense(3))
+    model.add(Dense(output_dim))
     model.add(BatchNormalization())
 
     #compile model
-    model.compile(loss='mean_squared_error', optimizer='adam')
+    model.compile(loss='mean_squared_error',
+                optimizer='adam',
+                metrics=['accuracy'])
+
+    model.summary()
 
     return model
 
@@ -193,7 +212,7 @@ if __name__ == "__main__":
     lossFunction = "mse"
     batchSize = 64
     learningRate = 1e-5
-    numberOfEpochs = 1000
+    numberOfEpochs = 50
 
     # Call the main function to train and evaluate the neural network
     main(neurons, activationFunctions, activationOutput, lossFunction, batchSize, learningRate, numberOfEpochs)
