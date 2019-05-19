@@ -1,4 +1,4 @@
-# Group 69 Neural Networks CBC
+# Neural Networks CBC
 
 This repository contains nn_lib, our implementation of a mini-neural network library, which will load the dataset from iris.dat and train a neural network based on the default parameters loaded in main,
 and learn_FM, learn_ROI, which simulates a robotic arm and makes predictions on the coordinate or region of the robotic arm.
